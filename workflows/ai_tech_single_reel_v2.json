@@ -1,0 +1,1144 @@
+{
+    "name": "AI News Workflow Version 2",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "triggerAtHour": 18
+                        }
+                    ]
+                }
+            },
+            "id": "a1000001-0000-0000-0000-000000000001",
+            "name": "Daily 6PM Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.2,
+            "position": [
+                -500,
+                200
+            ],
+            "notes": "Triggers daily at 6:00 PM IST. Adjust triggerAtHour for your peak engagement time."
+        },
+        {
+            "parameters": {
+                "url": "https://newsapi.org/v2/top-headlines",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "category",
+                            "value": "technology"
+                        },
+                        {
+                            "name": "pageSize",
+                            "value": "10"
+                        },
+                        {
+                            "name": "apiKey",
+                            "value": "ae0ee0b3c7ee41c8be4c707ce44f5b93"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "a1000001-0000-0000-0000-000000000002",
+            "name": "Fetch Tech News (NewsAPI)",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                -250,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=OpenAI%20OR%20ChatGPT&hl=en-IN&gl=IN&ceid=IN:en",
+                "options": {}
+            },
+            "id": "a1000001-0000-0000-0000-000000000003",
+            "name": "AI News: OpenAI",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                150
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=Anthropic%20OR%20Claude%20AI&hl=en-IN&gl=IN&ceid=IN:en",
+                "options": {}
+            },
+            "id": "a1000001-0000-0000-0000-000000000004",
+            "name": "AI News: Anthropic",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=Google%20Gemini%20OR%20Google%20DeepMind&hl=en-IN&gl=IN&ceid=IN:en",
+                "options": {}
+            },
+            "id": "a1000001-0000-0000-0000-000000000005",
+            "name": "AI News: Google Gemini",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Normalize NewsAPI articles to match RSS feed format\nconst articles = $input.first().json.articles || [];\n\nreturn articles\n  .filter(a => a.title && a.title !== '[Removed]')\n  .slice(0, 5)\n  .map(a => ({\n    json: {\n      title: a.title,\n      link: a.url,\n      content: a.description || '',\n      contentSnippet: a.description || '',\n      pubDate: a.publishedAt,\n      imageUrl: a.urlToImage,\n      source: a.source?.name || 'NewsAPI'\n    }\n  }));"
+            },
+            "id": "a1000001-0000-0000-0000-000000000006",
+            "name": "Format NewsAPI Output",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                0,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "numberInputs": 4
+            },
+            "id": "a1000001-0000-0000-0000-000000000007",
+            "name": "Merge All Feeds",
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 3,
+            "position": [
+                250,
+                200
+            ],
+            "notes": "Combines NewsAPI + TechCrunch + The Verge + Ars Technica feeds"
+        },
+        {
+            "parameters": {
+                "sortFieldsUi": {
+                    "sortField": [
+                        {
+                            "fieldName": "pubDate",
+                            "order": "descending"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "a1000001-0000-0000-0000-000000000008",
+            "name": "Sort by Date",
+            "type": "n8n-nodes-base.sort",
+            "typeVersion": 1,
+            "position": [
+                500,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "limit",
+                "maxItems": 3,
+                "jsCode": "\nconst items = $input.all();\nif (items.length === 0) return [];\n\n// Perform a classic global array shuffle Fisher-Yates logic fallback\nconst shuffled = items.sort(() => 0.5 - Math.random());\n\n// Extract exclusively the top 3 items of the fully shuffled global payload\nreturn shuffled.slice(0, 3);\n"
+            },
+            "id": "a1000001-0000-0000-0000-000000000009",
+            "name": "Pick Top 3 Articles",
+            "type": "n8n-nodes-base.limit",
+            "typeVersion": 1,
+            "position": [
+                1250,
+                200
+            ],
+            "notes": "Selects the single most recent article for today's post"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://openrouter.ai/api/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer YOUR_OPENROUTER_API_KEY_HERE"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"openai/gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a top Tech & AI News Instagram creator. For the provided AI industry news, output EXACTLY ONE slide.\\n\\nReturn THIS JSON structure:\\n{\\n  \\\"hook_slide\\\": {\\n    \\\"image_prompt\\\": \\\"(A hyper-detailed cinematic description for an AI image generator depicting the AI subject visually, e.g. glowing digital brains, neural networks, futuristic tech, quantum computers, masterpiece, 8k, cinematic lighting, NO TEXT IN IMAGE)\\\",\\n    \\\"text\\\": \\\"(A massive viral headline in ALL CAPS. Wrap the most important 1-3 words in <c> and </c> tags for orange highlighting)\\\",\\n    \\\"subtext\\\": \\\"(A short 1-2 sentence description explaining what the AI title actually means in normal casing. Do NOT use tags here.)\\\"\\n  },\\n  \\\"caption\\\": \\\"(A punchy Instagram caption summarizing the AI news with excitement)\\\",\\n  \\\"hashtags\\\": \\\"#ainews #openai #tech #artificialintelligence #chatgpt\\\"\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify(\"Title: \" + $json.title + \"\\nSnippet: \" + (($json.contentSnippet || $json.content) || \"\").substring(0, 2000)) }}\n    }\n  ],\n  \"response_format\": { \"type\": \"json_object\" }\n}",
+                "options": {
+                    "timeout": 60000
+                }
+            },
+            "id": "a1000001-0000-0000-0000-000000000010",
+            "name": "AI Content Generator",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1250,
+                200
+            ],
+            "notes": "Uses OpenRouter API with GPT-4o-mini. Generates hook, caption, imagePrompt, hashtags."
+        },
+        {
+            "parameters": {
+                "jsCode": "\nconst results = [];\nconst articles = $('Pick Top 3 Articles').all();\nconst aiResponses = $input.all();\n\nfor (let i = 0; i < aiResponses.length; i++) {\n    const inputData = aiResponses[i].json;\n    const article = (articles && articles[i]) ? articles[i].json : {};\n    \n    try {\n        let rawContent = \"\";\n        if (inputData.choices && inputData.choices[0]) {\n            const msg = inputData.choices[0].message;\n            rawContent = msg.content || msg.reasoning || \"\";\n        }\n        \n        let cleanContent = rawContent.replace(/```json/g, \"\").replace(/```/g, \"\").trim();\n        const parsed = JSON.parse(cleanContent);\n        \n        parsed.originalTitle = article.title;\n        parsed.originalLink = article.link;\n        parsed.originalImage = article.imageUrl;\n        \n        results.push({ json: parsed });\n    } catch (e) {\n        results.push({\n            json: {\n                hook: \"TECH JUST CHANGED FOREVER\",\n                caption: \"Failed to parse: \" + e.message,\n                hashtags: \"#tech\",\n                originalTitle: article.title,\n                originalLink: article.link,\n                originalImage: article.imageUrl,\n                error: e.message\n            }\n        });\n    }\n}\nreturn results;\n"
+            },
+            "id": "a1000001-0000-0000-0000-000000000011",
+            "name": "Parse AI Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1500,
+                200
+            ],
+            "notes": "Parses OpenRouter JSON response. Falls back to safe defaults if parsing fails."
+        },
+        {
+            "parameters": {
+                "jsCode": "const staticData = $getWorkflowStaticData('global');\nstaticData.postedUrls = staticData.postedUrls || [];\nconst aggr = $('Aggregate News').first().json;\nif (aggr && aggr.articleLinks) {\n    for (const link of aggr.articleLinks) {\n       staticData.postedUrls.push(link);\n    }\n    while(staticData.postedUrls.length > 300) {\n        staticData.postedUrls.shift();\n    }\n}\n\nconst result = $input.first().json;\nreturn [{\n  json: {\n    status: '\u2705 SUCCESS',\n    message: 'Instagram Reel published successfully!',\n    postId: result.id || 'unknown',\n    postedAt: new Date().toISOString(),\n    hook: $('Parse AI Response').first().json.hook\n  }\n}];"
+            },
+            "id": "a1000001-success",
+            "name": "Success Handler",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3500,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const error = $input.first().json;\nreturn [{\n  json: {\n    status: '\u274c ERROR',\n    message: 'Workflow failed',\n    error: error.message || JSON.stringify(error),\n    timestamp: new Date().toISOString()\n  }\n}];"
+            },
+            "id": "a1000001-error",
+            "name": "Error Handler",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                3500,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst postedUrls = staticData.postedUrls || [];\n\nconst unseen = $input.all().filter(item => !postedUrls.includes(item.json.link));\n\nif (unseen.length < 3) {\n    // If we run out of new articles, reset memory loop\n    staticData.postedUrls = [];\n    return $input.all();\n}\n\nreturn unseen;"
+            },
+            "id": "a1000001-filter-dups",
+            "name": "Filter Posted Articles",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                750,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "\nconst slides = [];\nlet finalCaption = '\ud83d\udd25 WEEKEND MOVIE ROUNDUP \ud83d\udd25\\n\\n';\n\n// The Parse node already did the extraction natively! No need to JSON.parse!\nconst topItem = $input.all()[0].json;\n\n// 1. Force the single 1-Image IGN Hook target\nslides.push({\n  type: 'hook',\n  image_prompt: topItem.hook_slide ? topItem.hook_slide.image_prompt : \"futuristic cinematic abstract movie background\",\n  text: topItem.hook_slide ? topItem.hook_slide.text : \"MAJOR UPDATE\",\n  subtext: topItem.hook_slide ? (topItem.hook_slide.subtext || \"\") : \"\"\n});\n\n// 2. Aggregate the Captions from all 3 inputs naturally\nlet tags = \"\";\nfor (let i=0; i < $input.all().length; i++) {\n  const content = $input.all()[i].json;\n  finalCaption += `\ud83c\udfac STORY ${i+1}:\\n${content.caption || \"Breaking News!\"}\\n\\n`;\n  if (content.hashtags) { tags += content.hashtags + \" \"; }\n}\n\nfinalCaption += tags;\n\nreturn {\n  json: {\n    slides: slides,\n    finalCaption: finalCaption\n  }\n};\n"
+            },
+            "id": "a1000001-aggregate",
+            "name": "Aggregate News",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1750,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "http://10.21.246.109:5000/create_carousel_images",
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ $json }}",
+                "options": {
+                    "timeout": 300000
+                }
+            },
+            "id": "v4-generate-images",
+            "name": "Generate Carousel Images",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                2500,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const aggr = $('Aggregate News').first().json;\nreturn [{\n  json: {\n    finalCaption: aggr.finalCaption,\n    articleLinks: aggr.articleLinks,\n    video_urls: $input.first().json.video_urls\n  }\n}];"
+            },
+            "id": "v4-save-caption",
+            "name": "Save Final Caption",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2750,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://graph.facebook.com/v18.0/17841475272247945/media",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "access_token",
+                            "value": "YOUR_META_GRAPH_ACCESS_TOKEN_HERE"
+                        },
+                        {
+                            "name": "media_type",
+                            "value": "REELS"
+                        },
+                        {
+                            "name": "video_url",
+                            "value": "={{ $json.video_urls[0] }}"
+                        },
+                        {
+                            "name": "caption",
+                            "value": "={{ $('Build Single Post Data').isExecuted ? $('Build Single Post Data').item.json.caption + '\\n\\n' + $('Build Single Post Data').item.json.hashtags : $('Aggregate News').item.json.finalCaption }}"
+                        }
+                    ]
+                },
+                "options": {},
+                "sendQueryParameters": true,
+                "sendBody": false
+            },
+            "id": "v4-create-parent",
+            "name": "Create Reel Media",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                3750,
+                200
+            ],
+            "retryOnFail": true,
+            "maxTries": 30,
+            "waitBetweenTries": 20000
+        },
+        {
+            "parameters": {
+                "resume": "afterInterval",
+                "unit": "minutes",
+                "amount": 8
+            },
+            "id": "v4-wait",
+            "name": "Wait for Carousel Processing",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                4000,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://graph.facebook.com/v18.0/17841475272247945/media_publish",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "access_token",
+                            "value": "YOUR_META_GRAPH_ACCESS_TOKEN_HERE"
+                        },
+                        {
+                            "name": "creation_id",
+                            "value": "={{ $json.id }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "v4-publish",
+            "name": "Publish Reel",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                4250,
+                200
+            ],
+            "retryOnFail": true,
+            "maxTries": 30,
+            "waitBetweenTries": 20000
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=DeepSeek%20AI&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-ign",
+            "name": "AI News: DeepSeek AI",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                600
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=Qwen%20AI%20OR%20Alibaba%20Cloud%20AI&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-gamespot",
+            "name": "AI News: Qwen AI",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                750
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=Llama%203%20OR%20Meta%20AI&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-smithsonian",
+            "name": "AI News: Llama 3",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                900
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=Mistral%20AI%20OR%20European%20AI&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-livescience",
+            "name": "AI News: Mistral AI",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                1050
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=xAI%20OR%20Grok&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-bbc-world",
+            "name": "AI News: xAI",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                1200
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=NVIDIA%20AI%20OR%20Jensen%20Huang&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-reuters",
+            "name": "AI News: NVIDIA AI",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                1350
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=Autonomous%20AI%20Agents&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-physorg",
+            "name": "AI News: Autonomous AI Agents",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                1500
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=AI%20Safety%20OR%20Artificial%20Intelligence%20Regulation&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-scidaily",
+            "name": "AI News: AI Safety",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                1650
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=Generative%20AI%20News&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-arxiv",
+            "name": "AI News: Generative AI News",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                1800
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://news.google.com/rss/search?q=AGI%20OR%20Artificial%20General%20Intelligence&hl=en-IN&gl=IN&ceid=IN:en"
+            },
+            "id": "v16-rss-mitai",
+            "name": "AI News: AGI",
+            "type": "n8n-nodes-base.rssFeedRead",
+            "typeVersion": 1,
+            "position": [
+                -250,
+                1950
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "\nconst now = new Date();\nconst dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...6=Sat\nconst isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);\n\n// Category rotation for weekdays\nconst categories = {\n    1: 'gaming',      // Monday\n    2: 'history',     // Tuesday\n    3: 'politics',    // Wednesday\n    4: 'physics',     // Thursday\n    5: 'ai_research'  // Friday\n};\n\nconst items = $input.all();\n\nreturn items.map(item => ({\n    json: {\n        ...item.json,\n        isWeekend: isWeekend,\n        dayOfWeek: dayOfWeek,\n        todayCategory: categories[dayOfWeek] || 'tech'\n    }\n}));\n"
+            },
+            "id": "v16-day-check",
+            "name": "Day of Week Check",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                850,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.isWeekend }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "id": "v16-if-weekend",
+            "name": "Is Weekend?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 2,
+            "position": [
+                1050,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "\nconst items = $input.all();\nif (items.length === 0) return [];\n\n// Global absolute mathematical shuffle across EVERY loaded news item without clamping limits!\nconst randomIndex = Math.floor(Math.random() * items.length);\n\nreturn [items[randomIndex]];\n"
+            },
+            "id": "v16-pick-one",
+            "name": "Pick 1 Article",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1250,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://openrouter.ai/api/v1/chat/completions",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer {{ $env.OPENROUTER_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={\n  \"model\": \"openai/gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a top Tech & AI News Instagram creator. For the provided AI industry news, output EXACTLY ONE slide.\\n\\nReturn THIS JSON structure:\\n{\\n  \\\"hook_slide\\\": {\\n    \\\"image_prompt\\\": \\\"(A hyper-detailed cinematic description for an AI image generator depicting the AI subject visually, e.g. glowing digital brains, neural networks, futuristic tech, quantum computers, masterpiece, 8k, cinematic lighting, NO TEXT IN IMAGE)\\\",\\n    \\\"text\\\": \\\"(A massive viral headline in ALL CAPS. Wrap the most important 1-3 words in <c> and </c> tags for orange highlighting)\\\",\\n    \\\"subtext\\\": \\\"(A short 1-2 sentence description explaining what the AI title actually means in normal casing. Do NOT use tags here.)\\\"\\n  },\\n  \\\"caption\\\": \\\"(A punchy Instagram caption summarizing the AI news with excitement)\\\",\\n  \\\"hashtags\\\": \\\"#ainews #openai #tech #artificialintelligence #chatgpt\\\"\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify(\"Title: \" + $json.title + \"\\nSnippet: \" + (($json.contentSnippet || $json.content) || \"\").substring(0, 2000)) }}\n    }\n  ],\n  \"response_format\": { \"type\": \"json_object\" }\n}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "id": "v16-ai-single",
+            "name": "AI Single Post Generator",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                1500,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "\nconst raw = $json;\nconst messageContent = raw.choices[0].message.content;\nlet parsed;\ntry {\n    parsed = JSON.parse(messageContent);\n} catch(e) {\n    const match = messageContent.match(/\\{[\\s\\S]*\\}/);\n    parsed = match ? JSON.parse(match[0]) : {};\n}\nreturn [{\n    json: {\n        ...parsed,\n        originalTitle: $('Pick 1 Article').first().json.title,\n        originalLink: $('Pick 1 Article').first().json.link\n    }\n}];\n"
+            },
+            "id": "v16-parse-single",
+            "name": "Parse Single AI Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1750,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "const news = $json.message ? JSON.parse($json.message.content) : $json;\nreturn {\n  json: {\n    slides: [\n      {\n        type: 'hook',\n        image_prompt: news.hook_slide ? news.hook_slide.image_prompt : '',\n        text: news.hook_slide ? news.hook_slide.text : '',\n        subtext: news.hook_slide ? news.hook_slide.subtext : ''\n      }\n    ],\n    caption: news.caption || '',\n    hashtags: news.hashtags || ''\n  }\n}"
+            },
+            "id": "v16-build-single",
+            "name": "Build Single Post Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                2000,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "append",
+                "numberInputs": 10
+            },
+            "id": "v16-merge-categories",
+            "name": "Merge New Category Feeds",
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 3,
+            "position": [
+                100,
+                900
+            ]
+        }
+    ],
+    "pinData": {},
+    "connections": {
+        "Daily 6PM Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Tech News (NewsAPI)",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: Generative AI News",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: AGI",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: Google Gemini",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: DeepSeek AI",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: Qwen AI",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: Llama 3",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: Mistral AI",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: xAI",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: NVIDIA AI",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: Autonomous AI Agents",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: AI Safety",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: Generative AI News",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "AI News: AGI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Tech News (NewsAPI)": {
+            "main": [
+                [
+                    {
+                        "node": "Format NewsAPI Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format NewsAPI Output": {
+            "main": [
+                [
+                    {
+                        "node": "Merge All Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: Generative AI News": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: AGI": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: Google Gemini": {
+            "main": [
+                [
+                    {
+                        "node": "Merge All Feeds",
+                        "type": "main",
+                        "index": 3
+                    }
+                ]
+            ]
+        },
+        "Merge All Feeds": {
+            "main": [
+                [
+                    {
+                        "node": "Sort by Date",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Sort by Date": {
+            "main": [
+                [
+                    {
+                        "node": "Filter Posted Articles",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Content Generator": {
+            "main": [
+                [
+                    {
+                        "node": "Parse AI Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse AI Response": {
+            "main": [
+                [
+                    {
+                        "node": "Aggregate News",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Filter Posted Articles": {
+            "main": [
+                [
+                    {
+                        "node": "Day of Week Check",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Pick Top 3 Articles": {
+            "main": [
+                [
+                    {
+                        "node": "AI Content Generator",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Aggregate News": {
+            "main": [
+                [
+                    {
+                        "node": "Generate Carousel Images",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Generate Carousel Images": {
+            "main": [
+                [
+                    {
+                        "node": "Create Reel Media",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Save Final Caption": {
+            "main": [
+                [
+                    {
+                        "node": "Split Item URLs",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Split Item URLs": {
+            "main": [
+                [
+                    {
+                        "node": "Create Carousel Item",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create Carousel Item": {
+            "main": [
+                [
+                    {
+                        "node": "Bundle Carousel IDs",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Bundle Carousel IDs": {
+            "main": [
+                [
+                    {
+                        "node": "Wait For Native Video Encoding",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create Carousel Container": {
+            "main": [
+                [
+                    {
+                        "node": "Wait for Carousel Processing",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait for Carousel Processing": {
+            "main": [
+                [
+                    {
+                        "node": "Publish Reel",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Publish Carousel": {
+            "main": [
+                [
+                    {
+                        "node": "Success Handler",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait For Native Video Encoding": {
+            "main": [
+                [
+                    {
+                        "node": "Create Carousel Container",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: DeepSeek AI": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: Qwen AI": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: Llama 3": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: Mistral AI": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: xAI": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: Autonomous AI Agents": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: AI Safety": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Day of Week Check": {
+            "main": [
+                [
+                    {
+                        "node": "Is Weekend?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Weekend?": {
+            "main": [
+                [
+                    {
+                        "node": "Pick Top 3 Articles",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Pick 1 Article",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Pick 1 Article": {
+            "main": [
+                [
+                    {
+                        "node": "AI Single Post Generator",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Single Post Generator": {
+            "main": [
+                [
+                    {
+                        "node": "Parse Single AI Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse Single AI Response": {
+            "main": [
+                [
+                    {
+                        "node": "Build Single Post Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Single Post Data": {
+            "main": [
+                [
+                    {
+                        "node": "Generate Carousel Images",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI News: NVIDIA AI": {
+            "main": [
+                [
+                    {
+                        "node": "Merge New Category Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Merge New Category Feeds": {
+            "main": [
+                [
+                    {
+                        "node": "Merge All Feeds",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create Reel Media": {
+            "main": [
+                [
+                    {
+                        "node": "Wait for Carousel Processing",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1",
+        "binaryMode": "separate",
+        "availableInMCP": false
+    },
+    "versionId": "",
+    "meta": {
+        "instanceId": "fc6ae1d42509f3df397ea33c2e8f376f123cdd51b3c5ef633d8cb02048f4c85f"
+    },
+    "tags": [
+        {
+            "name": "automation",
+            "id": "Mhdn72rvYTuD5Szo"
+        },
+        {
+            "name": "social-media",
+            "id": "iSXD3Rlie6NPZLZG"
+        }
+    ]
+}
